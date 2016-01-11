@@ -1,6 +1,8 @@
 "use strict"
 
 const Rx = require('rx');
+const Interface = require('./Interface');
+const React = require('react');
 
 let restaurant =
 [{ location: 'window', tableNumber: 1, totalTables: 2},
@@ -48,4 +50,4 @@ var seatingArrangements = zipped.filter( function(z) {
     return false;
 });
 
-module.exports = seatingArrangements;
+React.render(<Interface seating={seatingArrangements} />, document.body);
