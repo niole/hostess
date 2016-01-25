@@ -18,6 +18,7 @@ var compiler = webpack({
     alias: {
       '$': node_mods + '/jquery/dist/jquery.min.js',
       'react': node_mods + '/react/dist/react.js',
+       'd3': node_mods + '/d3/src/d3.min.js',
       'react-dom': node_mods + "react-dom/dist/react-dom.js",
       'rx': node_mods + '/rx/dist/rx.all.min.js'
     }
@@ -26,6 +27,7 @@ var compiler = webpack({
     noParse: [node_mods + '/jquery/dist/jquery.min.js',
               node_mods + '/react/dist/react.js',
               node_mods + '/rx/dist/rx.all.min.js',
+              node_mods + '/ds/src/d3.min.js',
               node_mods + "react-dom/dist/react-dom.js"],
     loaders: [
       { test: /\.js$/, exclude: node_mods, loader: "babel-loader"}
