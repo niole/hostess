@@ -6,6 +6,7 @@ const Rx = require('rx');
 class ResAdder extends React.Component {
     constructor(props) {
         super(props);
+        this.state = { conflict: null };
     }
 
     componentDidMount() {
@@ -45,7 +46,7 @@ class ResAdder extends React.Component {
     }
 
     showConflict(conflict) {
-        console.log(conflict);
+        this.setState({ conflict: conflict });
     }
 
     conflict(res, party) {
@@ -95,16 +96,23 @@ class ResAdder extends React.Component {
         return baseTime+inTime;
     }
 
+    displayConflict(state) {
+        return state.conflict ? <div>{state.conflict[0].inTime}</div> : <div/>;
+    }
+
     render() {
         return (
-            <form onSubmit={this.submit.bind(this)}>
-              <h2>Add Reservation</h2>
-              name: <input type="text" ref="name"/>
-              size: <input type="text" ref="size"/>
-              location preference: <input type="text" ref="locationpref"/>
-              in time: <input type="text" ref="intime"/>
-              <input type="submit"/>
-            </form>
+            <span>
+                <form onSubmit={this.submit.bind(this)}>
+                  <h2>Add Reservation</h2>
+                  name: <input type="text" ref="name"/>
+                  size: <input type="text" ref="size"/>
+                  location preference: <input type="text" ref="locationpref"/>
+                  in time: <input type="text" ref="intime"/>
+                  <input type="submit"/>
+                </form>
+                {this.displayConflict(this.state)}
+           </span>
         );
     }
 }
