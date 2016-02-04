@@ -10,54 +10,46 @@ class ResAdder extends React.Component {
     }
 
     componentDidMount() {
-        let parties = [];
-        let Parties = Rx.Observable.fromArray(parties);
+        //reservation = { party: party, table: table }
+        this.reservations = [];
+        let Reservations = Rx.Observable.fromArray(this.reservations);
 
         let restaurant =
-        [{ location: 'window', tableNumber: 1, totalTables: 2},
-        { location: '', tableNumber: 2, totalTables: 1},
-        { location: 'porch', tableNumber: 3, totalTables: 1}];
+        [{ location: 'window', number: 1, totalTables: 2},
+        { location: '', number: 2, totalTables: 1},
+        { location: 'porch', number: 3, totalTables: 1}];
+
         this.rest = Rx.Observable.fromArray(restaurant);
         this.newParty = new Rx.Subject();
+        this.defaultSource = Rx.Observable.empty();
 
-        this.newParty.map( value => {
-            return value;
-          }).subscribe((val) => {
-              let restComp = Rx.Observable.repeat(val, restaurant.length);
-              let resComp = Rx.Observable.repeat(val, parties.length);
+        const matches = {
+            no_res: Rx.Observable.zip(this.newParty
+                                  .selectMany(party => Rx.Observable.repeat(party, restaurant.length)), this.rest)
+                                  .filter(pair => this.isMatch(pair[1], pair[0])),
+            res: Rx.Observable.for( this.reservations, (res) =>
+                              matches.no_res.filter(party_table => !this.conflict(res, party_table[0], party_table[1])))
+        };
 
-              let timeConflict = Rx.Observable.zip(resComp, Parties).filter( partyPair => {
-                  let reservation = partyPair[1][0];
-                  let newParty = partyPair[0];
-                  return this.conflict(reservation, newParty);
-              });
-
-              let tableMatches = Rx.Observable.zip(restComp, this.rest)
-                                .first( pair => { return this.isMatch(pair[1], pair[0]);});
-
-              tableMatches.takeUntil(timeConflict).subscribe( t => {
-                  parties.push(t);
-              });
-
-              timeConflict.subscribe( conflict => {
-                  this.showConflict(conflict);
-              });
-          });
+        let allMatches = Rx.Observable.case(() => this.reservations.length ? 'res' : 'no_res', matches, this.defaultSource);
+        allMatches.subscribe( m => console.log('match', m));
     }
 
     showConflict(conflict) {
         this.setState({ conflict: conflict });
     }
 
-    conflict(res, party) {
-        return party.inTime < res.outTime && party.inTime >= res.inTime;;
+    conflict(reservation, party, table) {
+        return party.inTime < reservation.party.outTime &&
+            party.inTime >= reservation.party.inTime &&
+            reservation.table.number === table.number;
     }
 
     isMatch(tab, res) {
         if (tab.totalTables === 1 && res.partySize <= 4) {
             return true;
         } else if (tab.totalTables === 2 && res.partySize > 4 && res.partySize <= 6) {
-            //just end tables
+
             return true;
         } else if (tab.totalTables > 2 && res.partySize > 6) {
             //two end tables, 1 or more middle tables, extra calculation needed
