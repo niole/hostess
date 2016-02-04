@@ -6,7 +6,7 @@ const Rx = require('rx');
 class ResAdder extends React.Component {
     constructor(props) {
         super(props);
-        this.state = { conflict: null };
+        this.state = { match: [] };
     }
 
     componentDidMount() {
@@ -16,7 +16,7 @@ class ResAdder extends React.Component {
 
         let restaurant =
         [{ location: 'window', number: 1, totalTables: 2},
-        { location: '', number: 2, totalTables: 1},
+        { location: 'indoors', number: 2, totalTables: 1},
         { location: 'porch', number: 3, totalTables: 1}];
 
         this.rest = Rx.Observable.fromArray(restaurant);
@@ -31,12 +31,14 @@ class ResAdder extends React.Component {
                               matches.no_res.filter(party_table => !this.conflict(res, party_table[0], party_table[1])))
         };
 
-        let allMatches = Rx.Observable.case(() => this.reservations.length ? 'res' : 'no_res', matches, this.defaultSource);
-        allMatches.subscribe( m => console.log('match', m));
+        let allMatches = Rx.Observable.case(() => this.reservations.length ? 'res' : 'no_res', matches, this.defaultSource).first();
+        allMatches.subscribe( match => {
+            this.updateMatch(match);
+        });
     }
 
-    showConflict(conflict) {
-        this.setState({ conflict: conflict });
+    updateMatch(match) {
+        this.setState({ match });
     }
 
     conflict(reservation, party, table) {
@@ -76,6 +78,16 @@ class ResAdder extends React.Component {
         this.refs.intime.value = '';
     }
 
+    getOpenSeats(totalTables) {
+        if (totalTables === 1) {
+            return 2;
+        } else if (totalTables === 2) {
+            return 6;
+        } else {
+            return 6 + 2*(totalTables-2);
+        }
+    }
+
     getOutTime(inTime, partySize) {
         let baseTime = 90*60;
         let extra = partySize - 4;
@@ -88,22 +100,46 @@ class ResAdder extends React.Component {
         return baseTime+inTime;
     }
 
-    displayConflict(state) {
-        return state.conflict ? <div>{state.conflict[0].inTime}</div> : <div/>;
+    resAdder() {
+        return <form onSubmit={this.submit.bind(this)}>
+                <h2>Add Reservation</h2>
+                name: <input type="text" ref="name"/>
+                size: <input type="text" ref="size"/>
+                location preference: <input type="text" ref="locationpref"/>
+                in time: <input type="text" ref="intime"/>
+                <input type="submit"/>
+                <button>find open tables</button>
+              </form>;
+    }
+
+    showMatch(party_table) {
+      let [party, table] = party_table;
+      return party && table &&
+              <table>
+                <tbody>
+                  <tr>
+                    <td>{party.name}</td>
+                    <td>{table.number}</td>
+                  </tr>
+                  <tr>
+                    <td>in time: {party.inTime}</td>
+                    <td>table location: {table.location}</td>
+                  </tr>
+                  <tr>
+                    <td>out time: {party.outTime}</td>
+                    <td>max open seats: {this.getOpenSeats(table.totalTables)}</td>
+                  </tr>
+                </tbody>
+             </table>;
     }
 
     render() {
+        const c = this;
+        const s = c.state;
         return (
             <span>
-                <form onSubmit={this.submit.bind(this)}>
-                  <h2>Add Reservation</h2>
-                  name: <input type="text" ref="name"/>
-                  size: <input type="text" ref="size"/>
-                  location preference: <input type="text" ref="locationpref"/>
-                  in time: <input type="text" ref="intime"/>
-                  <input type="submit"/>
-                </form>
-                {this.displayConflict(this.state)}
+                {this.resAdder()}
+                {this.showMatch.call(c, s.match)}
            </span>
         );
     }
