@@ -4,52 +4,51 @@ const Rx = require('rx');
 const ResAdder = require('./ResAdder');
 const React = require('react');
 
-let computedMatch = [];
-
 let reservations = [{party: { name: "Mememe",
-          partySize: 3,
+          partySize: 2,
           locationPref: "",
-          inTime: 29385 },
-          table: { location: 'indoors', number: 2, totalTables: 1} },
+          inTime: 2,
+          outTime: 2},
+          table: { location: 'indoors', number: 1, totalTables: 1} }];
 
-{party: { name: "Ummers",
-          partySize: 5,
-          locationPref: "porch",
-          inTime: 1 },
-          table:
-          { location: 'window', number: 1, totalTables: 2}},
-{party:
-    { name: "Quinton",
-    partySize: 1,
-    locationPref: "window",
-    inTime: 29375 },
-table:
-{ location: 'indoors', number: 2, totalTables: 1}}];
 
 let Reservations = Rx.Observable.fromArray(reservations);
 
-let restaurant =
-[{ location: 'window', number: 1, totalTables: 2},
-{ location: 'indoors', number: 2, totalTables: 1},
-{ location: 'porch', number: 3, totalTables: 1}];
+let restaurant = [{ location: 'indoors', number: 1, totalTables: 1}];
 
-let rest = Rx.Observable.fromArray(restaurant);
-let newParty = new Rx.Subject();
-let defaultSource = Rx.Observable.empty();
+let Restaurant = Rx.Observable.fromArray(restaurant);
 
-//gets table matches for specific party
-//takes current reservations into account
+const rest = Rx.Observable.fromArray(restaurant);
+const newParty = new Rx.Subject();
+const defaultSource = Rx.Observable.empty();
+const updateReservations = new Rx.Subject();
 
-let matches = {
-    no_res: Rx.Observable.zip(newParty
-                          .selectMany(party => Rx.Observable.repeat(party, restaurant.length)), rest)
-                          .filter(pair => isMatch(pair[1], pair[0])),
-    res: Rx.Observable.for( reservations, (res) =>
-                                matches.no_res.filter(party_table => hasNoConflict(res, party_table[0], party_table[1])))
+updateReservations.subscribe( newRes => {
+    reservations.push(newRes);
+    console.log('reservations', reservations);
+});
 
-};
+let allMatches = newParty
+                    .selectMany( party =>
+                        Rx.Observable.merge(
+                            Restaurant
+                                .filter( table => isTableMatch(table, party))
+                                .select( table => table.number),
+                            Reservations.filter( res => timeConflict(res.party, party) && isTableMatch(res.table, party))
+                                        .select( reservation => reservation.table.number))
+                                        .reduce( (acc, x) => uniqueHash(acc, x), {}));
 
-let allMatches = Rx.Observable.case(() => reservations.length ? 'res' : 'no_res', matches, defaultSource).first();
+
+
+function uniqueHash(acc, x) {
+    if (acc[x]) {
+        //delete key from object
+        delete acc[x];
+    } else {
+        acc[x] = true;
+    }
+    return acc;
+}
 
 function getOpenTables(date) {
     //date will act as a key and map to some observable of reservations
@@ -68,26 +67,40 @@ function atDate(inTime, date) {
 function hasNoConflict(reservation, party, table) {
     let res = reservation.party;
     let resTable = reservation.table;
-
     if (resTable.number === table.number) {
         return party.inTime > res.outTime || party.outTime < res.inTime;
     }
     return true;
 }
 
+function timeConflict(res, party) {
+    //returns if there's a time conflict between incoming party and
+    //reservation
+    return (party.inTime >= res.inTime && party.outTime <= res.outTime)
+            || (party.outTime > res.inTime && party.outTime <= res.outTime)
+            || (party.inTime < res.outTime);
+}
 
-function isMatch(tab, res) {
-    if (tab.totalTables === 1 && res.partySize <= 4) {
+function isTableMatch(tab, party) {
+    //returns true if the table is suitable for the party
+    if (tab.totalTables === 1 && party.partySize <= 4) {
         return true;
-    } else if (tab.totalTables === 2 && res.partySize > 4 && res.partySize <= 6) {
+    } else if (tab.totalTables === 2 && party.partySize > 4 && party.partySize <= 6) {
 
         return true;
-    } else if (tab.totalTables > 2 && res.partySize > 6) {
+    } else if (tab.totalTables > 2 && party.partySize > 6) {
         //two end tables, 1 or more middle tables, extra calculation needed
         let openSeats = 6 + 2*(tab.totalTables-2);
-        return res.partySize <= openSeats;
+        return party.partySize <= openSeats;
     }
     return false;
 }
 
-React.render(<ResAdder allMatches={allMatches} newParty={newParty} match={computedMatch}/>, document.body);
+React.render(
+    <ResAdder
+      restaurant={restaurant}
+      allMatches={allMatches}
+      updateReservations={updateReservations}
+      newPartyAdder={newParty}
+    />
+    , document.body);

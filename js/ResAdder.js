@@ -4,14 +4,26 @@ const React = require('react');
 const Rx = require('rx');
 const test = require('./test');
 
+const propTypes = {
+    restaurant: React.PropTypes.array,
+    allMatches: React.PropTypes.object,
+    updateReservations: React.PropTypes.object,
+    newPartyAdder: React.PropTypes.object
+};
+
 class ResAdder extends React.Component {
     constructor(props) {
         super(props);
+        this.newParty = null;
         this.state = { match: [] };
     }
 
     submit(e) {
         e.preventDefault();
+
+        //TODO might be able to update match with an rx subject?
+        this.updateMatch([]);
+
         let name = this.refs.name.value;
         let partySize = +this.refs.size.value;
         let locationPref = this.refs.locationpref.value;
@@ -26,8 +38,8 @@ class ResAdder extends React.Component {
         } else {
             let partyProfile = {name, partySize, locationPref,
                                               inTime, outTime};
-            console.log('newpartyupdate');
-            this.props.newParty.onNext(partyProfile);
+            this.newParty = partyProfile;
+            this.props.newPartyAdder.onNext(partyProfile);
         }
 
         this.refs.name.value = '';
@@ -45,7 +57,7 @@ class ResAdder extends React.Component {
                 baseTime += (10*60);
             });
         }
-        return 3+inTime;//baseTime+inTime;
+        return inTime;//TODO add back in --> baseTime+inTime;
     }
 
     resAdder() {
@@ -60,11 +72,6 @@ class ResAdder extends React.Component {
                </form>;
     }
 
-    hideMatch() {
-        event.preventDefault();
-        this.setState({ match: [] });
-    }
-
     getOpenSeats(totalTables) {
         if (totalTables === 1) {
             return 2;
@@ -75,56 +82,75 @@ class ResAdder extends React.Component {
         }
     }
 
-    showMatch(party_table) {
-      if (party_table.length) {
-          let [party, table] = party_table;
-          return party && table &&
-                  <div>
-                      <table>
-                        <tbody>
-                          <tr>
-                            <td>the {party.name} party</td>
-                            <td>table {table.number}</td>
-                          </tr>
-                          <tr>
-                            <td>in time: {party.inTime}</td>
-                            <td>table location: {table.location}</td>
-                          </tr>
-                          <tr>
-                            <td>out time: {party.outTime}</td>
-                            <td>max open seats: {this.getOpenSeats(table.totalTables)}</td>
-                          </tr>
-                        </tbody>
-                     </table>
-                  </div>;
-        }
+    showMatch(table, party) {
+      //show matching table for inputted party
+      //tables start at table.number = 1 and
+      //are sorted
+      return table && party &&
+              <div>
+                  <table>
+                    <tbody>
+                      <tr>
+                        <td>the {party.name} party</td>
+                        <td>table {table.number}</td>
+                      </tr>
+                      <tr>
+                        <td>in time: {party.inTime}</td>
+                        <td>table location: {table.location}</td>
+                      </tr>
+                      <tr>
+                        <td>out time: {party.outTime}</td>
+                        <td>max open seats: {this.getOpenSeats(table.totalTables)}</td>
+                      </tr>
+                    </tbody>
+                 </table>
+                 <button onClick={this.addReservation.bind(this)}>Add Reservation</button>
+                 <button onClick={this.updateMatch.bind(this, [])}>Cancel Reservation</button>
+              </div>;
+    }
+
+    addReservation() {
+        event.preventDefault();
+        let newRes = { party: this.state.match[1], table: this.state.match[0] };
+        this.props.updateReservations.onNext(newRes);
+        this.updateMatch([]);
     }
 
     updateMatch(match) {
+        event.preventDefault();
+        if (!match.length) {
+            this.newParty = null;
+        }
         this.setState({ match });
+    }
+
+    getTableFromMatch(matchObj) {
+        for (let k in matchObj) {
+            return this.props.restaurant[k-1];
+        }
+        //if we reach this point, there are no
+        //found tables
+        return;
     }
 
     render() {
         const c = this;
         const s = c.state;
         const p = c.props;
-        console.log('this', this);
-        this.props.allMatches.subscribe( match => {
-            this.updateMatch(match);
+
+        p.allMatches.subscribe( match => {
+            c.updateMatch([c.getTableFromMatch(match), c.newParty]);
         });
 
         return (
             <span>
                 {c.resAdder()}
-                {c.showMatch.call(c, s.match)}
+                {c.showMatch.call(c, s.match[0], s.match[1])}
            </span>
         );
     }
 }
 
-ResAdder.propTypes = {
-    restaurant: React.PropTypes.array,
-    reservations: React.PropTypes.array
-};
+ResAdder.propTypes = propTypes;
 
 module.exports = ResAdder;
